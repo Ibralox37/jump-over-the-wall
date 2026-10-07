@@ -83,6 +83,18 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #060d18; col
   background: rgba(7,81,138,.85); color: #fff; font-family: var(--orbitron); font-weight: 900; font-size: 16px; cursor: pointer; }
 .fuss { margin-top: 14px; font-family: var(--orbitron); font-size: 10px; letter-spacing: 1px; opacity: .45; }
 .panel { scrollbar-width: none; } .panel::-webkit-scrollbar { display: none; }
+/* Vorix-Konto: Knopf oben links im Menü und das Anmelde-Fenster */
+.konto-knopf { position: absolute; z-index: 2; top: calc(12px + env(safe-area-inset-top)); left: 12px; max-width: 46vw; padding: 10px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,.14);
+  background: rgba(7,81,138,.85); color: #fff; font-family: var(--orbitron); font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.konto-knopf.an { background: rgba(10,60,40,.9); border-color: rgba(47,207,120,.55); }
+.feld-label { display: block; text-align: left; font-family: var(--orbitron); font-size: 11px; letter-spacing: 1.5px; opacity: .7; margin: 10px 2px 5px; }
+.feld { display: block; width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.3); color: #fff;
+  font-family: var(--rajdhani); font-size: 17px; font-weight: 600; outline: none; user-select: text; -webkit-user-select: text; }
+.feld:focus { border-color: var(--c-accent); box-shadow: 0 0 0 3px rgba(0,170,255,.2); }
+.fehler-text { min-height: 20px; color: #ff8a9a; font-size: 15px; font-weight: 600; line-height: 1.3; margin: 8px 0 4px; }
+.link-knopf { background: none; border: 0; padding: 0; color: var(--c-accent); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.konto-name { font-family: var(--orbitron); font-weight: 900; font-size: 22px; letter-spacing: 1px; margin: 4px 0 2px; word-break: break-all; }
+.konto-link-zeile { font-size: 13px; opacity: .8; margin-top: 12px; }
 /* Flache Bildschirme (Handy quer): alles etwas kompakter */
 @media (max-height: 640px) {
   #logo { width: min(170px, 36vw); }
@@ -96,6 +108,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #060d18; col
   .info { margin: 4px 0 8px; font-size: 15px; }
   .fuss { display: none; }
   .skin canvas { width: 40px; height: 40px; }
+  .feld { padding: 9px 12px; font-size: 16px; } .feld-label { margin: 6px 2px 4px; }
+  .konto-text { display: none; } .konto-link-zeile { margin-top: 8px; } .fehler-text { min-height: 6px; margin: 4px 0 2px; }
 }
 @media (max-height: 440px) { #logo { display: none; } .tipp { display: none; } }
 /* Handy hochkant: Tipp zum Querhalten zeigen und das Menü etwas nach oben rücken */
@@ -115,6 +129,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #060d18; col
 
 <!-- Startbildschirm -->
 <div id="menue" class="ebene">
+  <button id="konto-knopf" class="konto-knopf">👤 ANMELDEN</button>
   <div class="panel menue-panel">
     <img id="logo" src="vorix-logo-hell.png" alt="VORIX – WE CREATE GAMES">
     <div class="titel">JUMP OVER<br>THE WALL</div>
@@ -149,7 +164,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #060d18; col
   <div class="panel">
     <div style="font-size:54px;line-height:1">🏆</div>
     <h2>GESCHAFFT!</h2>
-    <div class="info">Du bist über die <b>große Mauer</b> gesprungen! 100 von 100 – das schafft nicht jeder.</div>
+    <div class="info" id="sieg-info">Du bist über die <b>große Mauer</b> gesprungen! 100 von 100 – das schafft nicht jeder.</div>
     <div class="abzeichen">✨ GOLD-SKIN FREIGESCHALTET</div>
     <div class="knoepfe" style="margin-top:12px"><button class="btn play" id="k-endlos">♾️ ENDLOS WEITER</button><button class="btn sub" id="k-sieg-menue">☰ MENÜ</button></div>
     <div class="tipp">Im Endlos-Modus wird es noch schneller. Wie weit kommst du?</div>
@@ -187,8 +202,33 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #060d18; col
       <p>🏆 Bei <b>100</b> wartet die <b>große Mauer</b>. Die schaffst du nur mit einem Doppelsprung!</p>
       <p>🎨 Mit mehr Punkten schaltest du neue Skins frei. Den Gold-Skin gibt es nur für den Sieg.</p>
       <p>⌨️ Am PC: Leertaste oder ↑ = springen, P = Pause.</p>
+      <p>👤 Oben links kannst du dich mit deinem <b>Vorix-Konto</b> anmelden, also mit demselben Konto wie in Timer Challenge.</p>
     </div>
     <button class="btn sub" id="k-hilfe-zu">VERSTANDEN</button>
+  </div>
+</div>
+
+<!-- Vorix-Konto -->
+<div id="konto" class="ebene dunkel versteckt">
+  <div class="panel">
+    <form id="konto-aus" autocomplete="on">
+      <h2>🔑 VORIX-KONTO</h2>
+      <div class="info konto-text">Melde dich mit deinem Konto von <b>Timer Challenge</b> an. Dein Bestwert und deine Skins bleiben auf diesem Gerät.</div>
+      <label class="feld-label" for="k-name">BENUTZERNAME</label>
+      <input class="feld" id="k-name" name="username" maxlength="20" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <label class="feld-label" for="k-passwort">PASSWORT</label>
+      <input class="feld" id="k-passwort" name="password" type="password" maxlength="72" autocomplete="current-password">
+      <div class="fehler-text" id="k-fehler"></div>
+      <div class="knoepfe"><button type="submit" class="btn play" id="k-anmelden">ANMELDEN</button><button type="button" class="btn sub" id="k-konto-zu">ZURÜCK</button></div>
+      <div class="konto-link-zeile">Noch kein Konto? <button type="button" class="link-knopf" id="k-timer">In Timer Challenge erstellen</button></div>
+    </form>
+    <div id="konto-an" class="versteckt">
+      <h2>👤 VORIX-KONTO</h2>
+      <div class="konto-name" id="k-angemeldet"></div>
+      <div class="info">Du bist angemeldet. Dein Bestwert und deine Skins bleiben auf diesem Gerät.</div>
+      <div class="knoepfe"><button class="btn sub" id="k-konto-fertig">FERTIG</button><button class="btn sub" id="k-abmelden">ABMELDEN</button></div>
+      <div class="tipp">Abmelden gilt nur hier. In Timer Challenge bleibst du angemeldet.</div>
+    </div>
   </div>
 </div>
 
@@ -333,8 +373,10 @@ function schlag(t, n) {
 /* ---------------- Spielablauf ---------------- */
 const $ = id => document.getElementById(id);
 function zeigeEbene(id) {
-  ['menue', 'gameover', 'sieg', 'pause', 'skins', 'hilfe'].forEach(e => $(e).classList.toggle('versteckt', e !== id));
+  ['menue', 'gameover', 'sieg', 'pause', 'skins', 'hilfe', 'konto'].forEach(e => $(e).classList.toggle('versteckt', e !== id));
   $('pause-knopf').classList.toggle('versteckt', id !== null || zustand !== 'spiel');
+  // Beim Spielen darf kein Knopf mehr ausgewählt sein, sonst drückt die Leertaste ihn mit
+  if (id === null && document.activeElement && document.activeElement !== document.body && document.activeElement.blur) document.activeElement.blur();
 }
 function neuesSpiel() {
   audio();
@@ -378,6 +420,8 @@ function zumMenue() {
 }
 function menueZeigen() {
   $('menue-werte').textContent = `BESTWERT ${daten.best}${daten.siege ? ' · 🏆 ' + daten.siege + (daten.siege === 1 ? ' SIEG' : ' SIEGE') : ''}`;
+  $('konto-knopf').textContent = daten.konto ? '👤 ' + daten.konto.name : '👤 ANMELDEN';
+  $('konto-knopf').classList.toggle('an', !!daten.konto);
   $('k-ton').textContent = daten.ton ? '🔊 TÖNE AN' : '🔇 TÖNE AUS';
   $('k-musik').textContent = daten.musik ? '🎵 MUSIK AN' : '🎵 MUSIK AUS';
   zeigeEbene('menue');
@@ -481,6 +525,12 @@ function sterben() {
 }
 function siegErreicht() {
   zeitlupe = 1.4; blitz = 0.5;
+  const info = $('sieg-info');
+  info.textContent = '';
+  if (daten.konto) info.append(`Stark, ${daten.konto.name}! `);
+  info.append('Du bist über die ');
+  const b = document.createElement('b'); b.textContent = 'große Mauer'; info.append(b);
+  info.append(' gesprungen! 100 von 100 – das schafft nicht jeder.');
   levelText = { text: 'GESCHAFFT!', zeit: 2.2 };
   TON.sieg();
   daten.siege++; daten.best = Math.max(daten.best, punkte); sichern();
@@ -754,12 +804,14 @@ function schleife(jetzt) {
 requestAnimationFrame(schleife);
 
 /* ---------------- Steuerung ---------------- */
+const istEingabe = el => !!(el && el.closest && el.closest('input, textarea, label'));   // Felder im Konto-Fenster
 window.addEventListener('pointerdown', e => {
-  if (e.target.closest && e.target.closest('button')) return;
+  if (e.target.closest && e.target.closest('button, input, label, a')) return;
   if (zustand === 'spiel') { e.preventDefault(); springen(); }
   else if (zustand === 'tot' && performance.now() - totZeit > 450) neuesSpiel();
 }, { passive: false });
 window.addEventListener('keydown', e => {
+  if (istEingabe(e.target)) return;   // beim Tippen von Name und Passwort nichts abfangen
   const sprungTaste = e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW';
   if (sprungTaste) e.preventDefault();
   if (e.repeat) return;
@@ -771,7 +823,7 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyP' || e.code === 'Escape') { if (zustand === 'spiel') pause(true); else if (zustand === 'pause') pause(false); }
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(true); });
-window.addEventListener('contextmenu', e => e.preventDefault());
+window.addEventListener('contextmenu', e => { if (!istEingabe(e.target)) e.preventDefault(); });   // in den Feldern bleibt Einfügen möglich
 
 $('k-spielen').onclick = neuesSpiel;
 $('k-nochmal').onclick = neuesSpiel;
@@ -811,11 +863,141 @@ function skinsZeigen() {
   }
 }
 
+/* ---------------- Vorix-Konto: Anmelden und Abmelden (genau wie in Spotter) ----------------
+   Ibo wollte am 07.10.2026: „mach für jedes Spiel Vorix-Konto". Erlaubt ist dasselbe wie bei Spotter
+   (Papa, Kennung ZC8): NUR Anmelden und den Namen anzeigen. Jump speichert NICHTS auf dem Server,
+   Bestwert und Skins bleiben auf dem Gerät.
+   WICHTIG – nicht ändern:
+    - speicherName: Jump hat seine EIGENE Sitzung. Nie den Sitzungs-Schlüssel von Timer Challenge (sb-…)
+      benutzen, sonst kann ein Abmelden hier Timer Challenge durcheinanderbringen.
+    - domain und Namensregel: genau wie in Timer Challenge, sonst passen die Konten nicht zusammen.
+    - Abmelden nur mit scope 'local'. Ohne das wäre man auch in Timer Challenge abgemeldet, auf allen Geräten.
+    - Jump legt keine Konten an und löscht keine. Das macht nur Timer Challenge.
+   ------------------------------------------------------------------------------------------- */
+const KONTO = {
+  url: 'https://ygdgqpedwdpbxlicviks.supabase.co',
+  schluessel: 'sb_publishable_QtZnXFRDB8ypHHmOuY-qLg_MI-52tM5',   // öffentlicher Schlüssel, darf im Code stehen
+  bibliothek: 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2',
+  speicherName: 'vorixJumpKonto',
+  domain: '@spieler.kronix-timer.app',
+  timerAdresse: 'https://ibralox37.github.io/Timer-/',
+};
+let sb = null;   // Verbindung zum Vorix-Server. Wird erst geladen, wenn jemand das Konto benutzt.
+function skriptLaden(src) {
+  return new Promise((ok, fehler) => {
+    const s = document.createElement('script');
+    s.src = src; s.async = true; s.crossOrigin = 'anonymous';
+    s.onload = ok; s.onerror = () => fehler(new Error('Konnte nicht laden: ' + src));
+    document.head.appendChild(s);
+  });
+}
+async function kontoClient() {
+  if (sb) return sb;
+  if (!window.supabase) await skriptLaden(KONTO.bibliothek);
+  sb = window.supabase.createClient(KONTO.url, KONTO.schluessel, {
+    auth: { storageKey: KONTO.speicherName, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+  });
+  return sb;
+}
+// Genau dieselbe Regel wie in Timer Challenge: Leerzeichen weg, 3–20 Zeichen, dann kleinschreiben + Domain
+const nameGueltig = name => /^[a-zA-Z0-9_]{3,20}$/.test(name);
+const nameZuMail = name => name.toLowerCase() + KONTO.domain;
+
+async function kontoAnmelden(eingabeName, passwort) {
+  const name = String(eingabeName || '').trim();
+  if (!nameGueltig(name)) throw new Error('name');
+  if (String(passwort || '').length < 6) throw new Error('passwort');
+  const c = await kontoClient();
+  const { data, error } = await c.auth.signInWithPassword({ email: nameZuMail(name), password: passwort });
+  if (error) throw error;
+  const id = data.user.id;
+  // Den echten Namen (mit Groß- und Kleinschreibung) aus dem Profil holen und prüfen, ob das Konto gesperrt ist (nur lesen)
+  let echterName = name, gesperrt = false, grund = '';
+  try {
+    let antwort = await c.from('profiles').select('username,banned,ban_reason').eq('id', id).maybeSingle();
+    if (antwort.error) antwort = await c.from('profiles').select('username').eq('id', id).maybeSingle();
+    if (antwort.data) {
+      echterName = antwort.data.username || name;
+      gesperrt = antwort.data.banned === true;
+      grund = antwort.data.ban_reason || '';
+    }
+  } catch (e) { /* dann bleibt der eingegebene Name */ }
+  if (gesperrt) {
+    try { await c.auth.signOut({ scope: 'local' }); } catch (e) {}
+    const f = new Error('gesperrt'); f.grund = grund; throw f;
+  }
+  daten.konto = { id, name: String(echterName).slice(0, 20) };
+  sichern();
+}
+async function kontoAbmelden() {
+  try { const c = await kontoClient(); await c.auth.signOut({ scope: 'local' }); } catch (e) { /* offline – egal */ }
+  try { localStorage.removeItem(KONTO.speicherName); } catch (e) {}   // nur UNSERE Sitzung, nie die von Timer Challenge
+  delete daten.konto;
+  sichern();
+}
+// Nachsehen, ob die Anmeldung noch gilt. Ohne Internet bleibt der Name einfach stehen.
+// Läuft nie mitten im Spiel, damit das Laden nicht ruckelt.
+function kontoSpaeterPruefen() {
+  if (!daten.konto || !navigator.onLine) return;
+  if (zustand === 'spiel' || zustand === 'pause') { setTimeout(kontoSpaeterPruefen, 3000); return; }
+  kontoClient()
+    .then(c => c.auth.getSession())
+    .then(({ data }) => {
+      if (!data.session) { delete daten.konto; sichern(); if (zustand === 'menue') menueZeigen(); }
+    })
+    .catch(() => { /* Server nicht erreichbar – Name bleibt stehen */ });
+}
+function kontoFehlerText(e) {
+  const m = String((e && (e.message || e.code)) || '');
+  if (m === 'name') return 'Der Name hat 3 bis 20 Zeichen: Buchstaben, Zahlen oder _ (so wie bei Timer Challenge).';
+  if (m === 'passwort') return 'Das Passwort hat mindestens 6 Zeichen.';
+  if (m === 'gesperrt') return '⛔ Dieses Konto ist gesperrt.' + (e.grund ? ' Grund: ' + e.grund : '');
+  if (/invalid login credentials|invalid_credentials/i.test(m)) return 'Name oder Passwort stimmt nicht.';
+  if (/rate limit|too many/i.test(m)) return 'Zu viele Versuche. Warte kurz und versuch es dann nochmal.';
+  if (/fetch|network|load failed|konnte nicht laden/i.test(m)) return 'Keine Verbindung zum Vorix-Server. Ist das Internet an?';
+  return 'Das hat nicht geklappt. Versuch es gleich nochmal.';
+}
+function kontoZeigen() {
+  const an = !!daten.konto;
+  $('konto-aus').classList.toggle('versteckt', an);
+  $('konto-an').classList.toggle('versteckt', !an);
+  $('k-fehler').textContent = '';
+  $('k-passwort').value = '';
+  if (an) $('k-angemeldet').textContent = daten.konto.name;
+  zeigeEbene('konto');
+  if (!an && window.matchMedia('(pointer: fine)').matches) setTimeout(() => $('k-name').focus(), 250);   // am PC gleich lostippen
+}
+async function kontoLos() {
+  const knopf = $('k-anmelden');
+  if (knopf.disabled) return;
+  $('k-fehler').textContent = '';
+  knopf.disabled = true; knopf.textContent = 'PRÜFE …';
+  try {
+    await kontoAnmelden($('k-name').value, $('k-passwort').value);
+    $('k-passwort').value = '';
+    TON.skin();
+    kontoZeigen();
+  } catch (e) {
+    console.warn('Anmeldung:', e);
+    $('k-fehler').textContent = kontoFehlerText(e);
+  } finally {
+    knopf.disabled = false; knopf.textContent = 'ANMELDEN';
+  }
+}
+$('konto-knopf').onclick = kontoZeigen;
+$('konto-aus').addEventListener('submit', e => { e.preventDefault(); kontoLos(); });   // Knopf ANMELDEN oder Enter im Passwort-Feld
+$('k-name').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('k-passwort').focus(); } });
+$('k-konto-zu').onclick = () => { $('k-passwort').value = ''; menueZeigen(); };
+$('k-konto-fertig').onclick = menueZeigen;
+$('k-abmelden').onclick = async () => { await kontoAbmelden(); kontoZeigen(); };
+$('k-timer').onclick = () => window.open(KONTO.timerAdresse, '_blank', 'noopener');
+
 // Web-App: Service Worker nur im Internet (https) oder auf dem Test-Rechner
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 menueZeigen();
+setTimeout(kontoSpaeterPruefen, 1500);   // gilt die Anmeldung mit dem Vorix-Konto noch?
 </script>
 </body>
 </html>
