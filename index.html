@@ -2,6 +2,9 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
+<!-- Sicherheit (08.10.2026): Das Spiel darf nur von diesen Adressen etwas laden. Neue Adresse noetig? Hier eintragen. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://ygdgqpedwdpbxlicviks.supabase.co https://fonts.googleapis.com https://fonts.gstatic.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-src 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
 <title>Jump over the Wall – ein Spiel von VORIX</title>
 <meta name="description" content="Jump over the Wall von VORIX: Spring über Zacken und Mauern, schalte Skins frei und überspringe bei 100 die große Mauer. Kostenlos im Browser und auf dem Handy.">
@@ -332,6 +335,8 @@ const berge = [0.12, 0.3].map((faktor, i) => {
   p.push([46, p[0][1]]);
   return { faktor, punkte: p, laenge: 46 };
 });
+// Geschwindigkeitsstreifen, wenn es richtig schnell wird
+const streifen = Array.from({ length: 14 }, () => ({ y: 0.08 + Math.random() * 0.85, l: 0.5 + Math.random(), v: 0.7 + Math.random() * 0.8, o: Math.random() }));
 
 /* ---------------- Zustand ---------------- */
 let zustand = 'menue';      // menue | spiel | pause | tot | sieg
@@ -339,6 +344,8 @@ let sp = { x: 2.6, y: 0, vy: 0, boden: true, doppel: true, winkel: 0, luft: 0, p
 let hind = [], teile = [], spur = [];
 let punkte = 0, tempo = START_TEMPO, weltX = 0, bisNaechstes = 6, endlos = false;
 let zeitlupe = 0, wackeln = 0, blitz = 0, levelText = null, hinweis = null, totZeit = 0, welt = WELTEN[0], menueHuepf = 0;
+let alteWelt = null, uebergang = 0;   // für den weichen Farbwechsel beim Level-Wechsel
+const wenigBewegung = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;   // dann kein Wackeln
 let rekordAlt = 0;
 
 /* ---------------- Töne und Musik (werden direkt erzeugt, keine Dateien) ---------------- */
@@ -423,7 +430,7 @@ function neuesSpiel() {
   sp = { x: 2.6, y: 0, vy: 0, boden: true, doppel: true, winkel: 0, luft: 0, puffer: 0, sprang: false };
   hind = []; teile = []; spur = [];
   punkte = 0; tempo = START_TEMPO; bisNaechstes = 5; endlos = false;
-  zeitlupe = 0; wackeln = 0; blitz = 0; hinweis = null; welt = WELTEN[0];
+  zeitlupe = 0; wackeln = 0; blitz = 0; hinweis = null; welt = WELTEN[0]; uebergang = 0;
   rekordAlt = daten.best;
   daten.spiele++; sichern();
   zustand = 'spiel';
@@ -435,10 +442,10 @@ function springen() {
   if (zustand !== 'spiel' || zeitlupe > 0) return;
   // Bodensprung (kurz nach dem Verlassen einer Kante geht er auch noch)
   if (sp.boden || (sp.luft < 0.09 && !sp.sprang)) {
-    sp.vy = SPRUNG; sp.boden = false; sp.sprang = true;
+    sp.vy = SPRUNG; sp.boden = false; sp.sprang = true; sp.quetsch = -0.2;   // beim Absprung kurz in die Länge ziehen
     staub(); TON.sprung(); daten.spruenge++;
   } else if (sp.doppel) {
-    sp.vy = DOPPEL; sp.doppel = false;
+    sp.vy = DOPPEL; sp.doppel = false; sp.quetsch = -0.14;
     ring(); TON.doppel(); daten.spruenge++;
   } else {
     sp.puffer = 0.12;   // kurz vor der Landung gedrückt: springt sofort beim Aufkommen
@@ -534,7 +541,7 @@ function punktGeschafft(h) {
   if (h.typ === 'finale') return siegErreicht();
   TON.punkt();
   const neueWelt = WELTEN[Math.min(3, Math.floor(punkte / 25))];
-  if (!endlos && neueWelt !== welt) { welt = neueWelt; levelText = { text: welt.name, zeit: 1.6 }; blitz = 0.35; TON.level(); }
+  if (!endlos && neueWelt !== welt) { alteWelt = welt; uebergang = 1; welt = neueWelt; levelText = { text: welt.name, zeit: 1.6 }; blitz = 0.2; TON.level(); }
   // Neuer Skin freigeschaltet?
   for (const s of SKINS) if (!s.nurSieg && s.ab > 0 && punkte === s.ab && rekordAlt < s.ab) { hinweis = { text: `🎨 Neuer Skin: ${s.name}!`, zeit: 2.4 }; TON.skin(); }
 }
@@ -595,6 +602,8 @@ function aktualisieren(dt) {
   teile = teile.filter(t => t.leben > 0);
   if (wackeln > 0) wackeln = Math.max(0, wackeln - dt);
   if (blitz > 0) blitz = Math.max(0, blitz - dt);
+  if (uebergang > 0) uebergang = Math.max(0, uebergang - dt / 1.2);      // weicher Farbwechsel zum neuen Level
+  sp.quetsch = (sp.quetsch || 0) * Math.exp(-dt * 13);                   // Strecken/Stauchen federt zurück
   if (levelText) { levelText.zeit -= dt; if (levelText.zeit <= 0) levelText = null; }
   if (hinweis) { hinweis.zeit -= dt; if (hinweis.zeit <= 0) hinweis = null; }
 
@@ -639,7 +648,7 @@ function figurPhysik(t, mitHindernissen) {
     }
   }
   if (sp.y <= stuetze) {
-    if (!sp.boden && sp.vy < -4 && mitHindernissen) staub();
+    if (!sp.boden && sp.vy < -4) { if (mitHindernissen) staub(); sp.quetsch = Math.min(0.3, -sp.vy * 0.016); }   // beim Landen stauchen
     sp.y = stuetze; sp.vy = 0; sp.boden = true; sp.doppel = true; sp.luft = 0; sp.sprang = false;
     sp.winkel = Math.round(sp.winkel / (Math.PI / 2)) * (Math.PI / 2);
     if (sp.puffer > 0) { sp.puffer = 0; springen(); }
@@ -652,8 +661,9 @@ function figurPhysik(t, mitHindernissen) {
 }
 
 /* ---------------- Zeichnen ---------------- */
-function figur(c, skin, x, y, s, winkel) {
-  c.save(); c.translate(x, y); c.rotate(winkel);
+// quetsch > 0: gestaucht (Landung), < 0: gestreckt (Absprung). Unten bleibt die Figur dabei auf dem Boden.
+function figur(c, skin, x, y, s, winkel, quetsch = 0) {
+  c.save(); c.translate(x, y + s / 2 * quetsch); c.scale(1 + quetsch * 0.7, 1 - quetsch); c.rotate(winkel);
   const h = s / 2;
   const rund = (r) => { c.beginPath(); c.moveTo(-h + r, -h); c.arcTo(h, -h, h, h, r); c.arcTo(h, h, -h, h, r); c.arcTo(-h, h, -h, -h, r); c.arcTo(-h, -h, h, -h, r); c.closePath(); };
   const augen = (farbe = '#fff') => { c.fillStyle = farbe; c.fillRect(-s * 0.26, -s * 0.18, s * 0.16, s * 0.2); c.fillRect(s * 0.1, -s * 0.18, s * 0.16, s * 0.2); };
@@ -692,30 +702,69 @@ function figur(c, skin, x, y, s, winkel) {
     c.shadowColor = skin.farbe; c.shadowBlur = s * 0.55; c.strokeStyle = skin.farbe; c.lineWidth = s * 0.1; c.stroke(); c.shadowBlur = 0;
     augen();
   }
+  // Glanz oben links: lässt die Figur plastischer wirken
+  if (skin.id === 'pfannkuchen') { c.beginPath(); c.arc(0, 0, h, 0, Math.PI * 2); } else rund(s * 0.18);
+  c.save(); c.clip();
+  const glanz = c.createLinearGradient(-h, -h, h * 0.3, h * 0.3);
+  glanz.addColorStop(0, 'rgba(255,255,255,.28)'); glanz.addColorStop(0.5, 'rgba(255,255,255,.05)'); glanz.addColorStop(0.51, 'rgba(255,255,255,0)');
+  c.fillStyle = glanz; c.fillRect(-h, -h, s, s);
+  c.restore();
   c.restore();
 }
-function zeichnen() {
-  ctx.save();
-  if (wackeln > 0) ctx.translate((Math.random() - 0.5) * E * wackeln * 0.6, (Math.random() - 0.5) * E * wackeln * 0.6);
-  // Himmel
-  const himmel = ctx.createLinearGradient(0, 0, 0, BODEN);
-  himmel.addColorStop(0, welt.himmel[0]); himmel.addColorStop(1, welt.himmel[1]);
-  ctx.fillStyle = himmel; ctx.fillRect(-20, -20, W + 40, BODEN + 20);
-  // Sterne
-  ctx.fillStyle = 'rgba(255,255,255,.75)';
-  for (const s of sterne) {
-    const x = ((s.x * W * 2 - weltX * E * 0.03) % (W * 2) + W * 2) % (W * 2);
-    if (x < W) ctx.fillRect(x, s.y * BODEN * 0.7, s.r, s.r);
-  }
-  // Sonne mit Streifen
+// '#rrggbb' → 'rgba(r,g,b,a)'
+function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+function rundRechteck(c, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+// Himmel und Sonne werden pro Welt einmal vorgemalt und dann nur noch kopiert (schont den Handy-Akku)
+const himmelSpeicher = new Map();
+let himmelGroesse = '';
+function himmelBild(w) {
+  const schluessel = W + 'x' + H;
+  if (himmelGroesse !== schluessel) { himmelSpeicher.clear(); himmelGroesse = schluessel; }
+  let c = himmelSpeicher.get(w);
+  if (c) return c;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(W * dpr)); c.height = Math.max(1, Math.round(BODEN * dpr));
+  const x = c.getContext('2d');
+  x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const g = x.createLinearGradient(0, 0, 0, BODEN);
+  g.addColorStop(0, w.himmel[0]); g.addColorStop(1, w.himmel[1]);
+  x.fillStyle = g; x.fillRect(0, 0, W, BODEN);
   const sx = W * 0.72, sy = BODEN - E * 1.2, sr = Math.min(E * 2.6, W * 0.22);
-  const sg = ctx.createLinearGradient(0, sy - sr, 0, sy + sr);
-  sg.addColorStop(0, welt.sonne[0]); sg.addColorStop(1, welt.sonne[1]);
-  ctx.save(); ctx.globalAlpha = 0.55; ctx.shadowColor = welt.sonne[0]; ctx.shadowBlur = 40;
-  ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fillStyle = sg; ctx.fill(); ctx.restore();
-  ctx.fillStyle = welt.himmel[1];
-  for (let i = 0; i < 6; i++) { const y = sy + i * sr * 0.17; ctx.fillRect(sx - sr - 2, y, sr * 2 + 4, 2 + i * 1.6); }
-  // Berge
+  const schein = x.createRadialGradient(sx, sy, sr * 0.2, sx, sy, sr * 3.2);   // Schein um die Sonne
+  schein.addColorStop(0, hexA(w.sonne[0], 0.28)); schein.addColorStop(1, hexA(w.sonne[0], 0));
+  x.fillStyle = schein; x.fillRect(0, 0, W, BODEN);
+  const sg = x.createLinearGradient(0, sy - sr, 0, sy + sr);
+  sg.addColorStop(0, w.sonne[0]); sg.addColorStop(1, w.sonne[1]);
+  x.save(); x.globalAlpha = 0.62; x.shadowColor = w.sonne[0]; x.shadowBlur = 50;
+  x.beginPath(); x.arc(sx, sy, sr, 0, Math.PI * 2); x.fillStyle = sg; x.fill(); x.restore();
+  x.fillStyle = w.himmel[1];
+  for (let i = 0; i < 6; i++) { const y = sy + i * sr * 0.17; x.fillRect(sx - sr - 2, y, sr * 2 + 4, 2 + i * 1.6); }
+  himmelSpeicher.set(w, c);
+  return c;
+}
+let vignette = null, vignetteGroesse = '';
+function vignetteBild() {
+  const schluessel = W + 'x' + H;
+  if (vignette && vignetteGroesse === schluessel) return vignette;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  vignette = document.createElement('canvas');
+  vignette.width = Math.max(1, Math.round(W * dpr)); vignette.height = Math.max(1, Math.round(H * dpr));
+  const x = vignette.getContext('2d');
+  x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const g = x.createRadialGradient(W / 2, H * 0.48, Math.min(W, H) * 0.35, W / 2, H * 0.48, Math.max(W, H) * 0.78);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.5)');
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  vignetteGroesse = schluessel;
+  return vignette;
+}
+// Himmel, Sonne und Berge einer Welt (a = Deckkraft, für den weichen Farbwechsel)
+function hintergrund(w, a) {
+  ctx.globalAlpha = a;
+  ctx.drawImage(himmelBild(w), 0, 0, W, BODEN);
   for (const b of berge) {
     ctx.beginPath(); ctx.moveTo(-10, BODEN);          // links außerhalb anfangen, sonst sieht man am Rand einen Strich
     for (let x = -10; x <= W + 10; x += 10) {
@@ -726,73 +775,158 @@ function zeichnen() {
       ctx.lineTo(x, BODEN - hh * E * 0.85);
     }
     ctx.lineTo(W + 10, BODEN); ctx.closePath();
-    ctx.fillStyle = b.faktor < 0.2 ? welt.berg : welt.himmel[0];
-    ctx.globalAlpha = b.faktor < 0.2 ? 0.75 : 0.95; ctx.fill();
-    ctx.globalAlpha = 0.5; ctx.strokeStyle = welt.haupt; ctx.lineWidth = 1.5; ctx.stroke(); ctx.globalAlpha = 1;
+    const nah = b.faktor >= 0.2;
+    const bg = ctx.createLinearGradient(0, BODEN - E * 3.5, 0, BODEN);
+    bg.addColorStop(0, nah ? w.himmel[0] : w.berg); bg.addColorStop(1, nah ? '#03060c' : w.himmel[0]);
+    ctx.fillStyle = bg; ctx.globalAlpha = a * (nah ? 0.97 : 0.8); ctx.fill();
+    ctx.globalAlpha = a * (nah ? 0.6 : 0.4); ctx.strokeStyle = w.haupt; ctx.lineWidth = 1.5; ctx.stroke();
   }
-  // Boden mit Neon-Gitter
-  ctx.fillStyle = '#04080f'; ctx.fillRect(-20, BODEN, W + 40, H - BODEN + 20);
-  ctx.strokeStyle = welt.haupt; ctx.globalAlpha = 0.28; ctx.lineWidth = 1;
-  const abstand = E * 1.4, versatz = (weltX * E) % abstand;
-  for (let x = -versatz; x < W + abstand; x += abstand) { ctx.beginPath(); ctx.moveTo(x, BODEN); ctx.lineTo(x - (W / 2 - x) * 0.4, H); ctx.stroke(); }
-  for (let k = 1; k < 9; k++) { const y = BODEN + k * k * (H - BODEN) / 64; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
   ctx.globalAlpha = 1;
-  ctx.save(); ctx.shadowColor = welt.haupt; ctx.shadowBlur = 14; ctx.strokeStyle = welt.haupt; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(0, BODEN); ctx.lineTo(W, BODEN); ctx.stroke(); ctx.restore();
-  // Hindernisse
+}
+// Hindernisse. spiegel = true: für die Spiegelung im Boden (ohne teures Leuchten)
+function hindernisseZeichnen(spiegel) {
+  const a0 = ctx.globalAlpha;
   for (const h of hind) {
     const x = h.x * E;
-    if (x > W + E * 4) continue;
+    if (x > W + E * 4 || x + h.breite * E < -E * 2) continue;
     if (h.typ === 'zacke') {
-      ctx.save(); ctx.shadowColor = '#ff4f6d'; ctx.shadowBlur = 12;
+      const spitze = BODEN - h.hoehe * E;
       for (let i = 0; i < h.anzahl; i++) {
         const zx = x + i * 0.9 * E;
-        ctx.beginPath(); ctx.moveTo(zx, BODEN); ctx.lineTo(zx + 0.45 * E, BODEN - h.hoehe * E); ctx.lineTo(zx + 0.9 * E, BODEN); ctx.closePath();
-        ctx.fillStyle = '#2a0610'; ctx.fill(); ctx.strokeStyle = '#ff4f6d'; ctx.lineWidth = 2.5; ctx.stroke();
+        const g = ctx.createLinearGradient(0, spitze, 0, BODEN);
+        g.addColorStop(0, '#ff7a92'); g.addColorStop(0.4, '#7a1228'); g.addColorStop(1, '#1e040b');
+        ctx.beginPath(); ctx.moveTo(zx, BODEN); ctx.lineTo(zx + 0.45 * E, spitze); ctx.lineTo(zx + 0.9 * E, BODEN); ctx.closePath();
+        ctx.fillStyle = g; ctx.fill();
+        if (!spiegel) { ctx.shadowColor = '#ff4f6d'; ctx.shadowBlur = 12; }
+        ctx.strokeStyle = '#ff4f6d'; ctx.lineWidth = 2.5; ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = a0 * 0.6;                       // helle Kante links
+        ctx.strokeStyle = '#ffe0e6'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(zx + E * 0.13, BODEN - E * 0.08); ctx.lineTo(zx + 0.43 * E, spitze + E * 0.14); ctx.stroke();
+        ctx.globalAlpha = a0;
       }
-      ctx.restore();
     } else {
       const finale = h.typ === 'finale';
       const farbe = finale ? '#ffd24a' : welt.haupt;
-      const top = BODEN - h.hoehe * E, br = h.breite * E;
-      ctx.save(); ctx.shadowColor = farbe; ctx.shadowBlur = finale ? 30 : 14;
-      ctx.fillStyle = finale ? '#2a1e05' : '#0a1422'; ctx.fillRect(x, top, br, h.hoehe * E);
-      ctx.strokeStyle = farbe; ctx.lineWidth = finale ? 4 : 2.5; ctx.strokeRect(x, top, br, h.hoehe * E);
-      ctx.restore();
-      ctx.strokeStyle = farbe; ctx.globalAlpha = 0.35; ctx.lineWidth = 1;           // Mauersteine
-      for (let yy = top + E * 0.4; yy < BODEN; yy += E * 0.4) { ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x + br, yy); ctx.stroke(); }
-      ctx.globalAlpha = 1;
-      if (finale) {
+      const top = BODEN - h.hoehe * E, br = h.breite * E, hh = h.hoehe * E;
+      const g = ctx.createLinearGradient(0, top, 0, BODEN);
+      g.addColorStop(0, hexA(farbe, 0.35)); g.addColorStop(0.22, finale ? '#2a1e05' : '#0c1a2c'); g.addColorStop(1, finale ? '#120c02' : '#050a14');
+      ctx.fillStyle = g; ctx.fillRect(x, top, br, hh);
+      ctx.globalAlpha = a0 * 0.32;                         // Mauersteine, versetzt wie echte Steine
+      ctx.strokeStyle = farbe; ctx.lineWidth = 1;
+      const reihe = E * 0.4, stein = E * 0.6;
+      for (let r = 0, yy = top; yy < BODEN - 1; r++, yy += reihe) {
+        if (r > 0) { ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x + br, yy); ctx.stroke(); }
+        for (let fx = x + (r % 2 ? stein / 2 : stein); fx < x + br - 2; fx += stein) {
+          ctx.beginPath(); ctx.moveTo(fx, yy); ctx.lineTo(fx, Math.min(BODEN, yy + reihe)); ctx.stroke();
+        }
+      }
+      ctx.globalAlpha = a0;
+      if (!spiegel) { ctx.shadowColor = farbe; ctx.shadowBlur = finale ? 30 : 14; }
+      ctx.strokeStyle = farbe; ctx.lineWidth = finale ? 4 : 2.5; ctx.strokeRect(x, top, br, hh);
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = a0 * 0.55; ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 3, top + 3, Math.max(0, br - 6), 2);   // Lichtkante oben
+      ctx.globalAlpha = a0;
+      if (finale && !spiegel) {
         ctx.save(); ctx.fillStyle = '#ffd24a'; ctx.font = `900 ${Math.round(E * 0.55)}px Orbitron, sans-serif`; ctx.textAlign = 'center';
         ctx.shadowColor = '#ffd24a'; ctx.shadowBlur = 16; ctx.fillText('100', x + br / 2, top + E * 0.95); ctx.restore();
       }
     }
   }
-  // Spur und Figur
+}
+// Wo steht die Figur gerade drauf? (für den Schatten unter ihr)
+function stuetzeUnterFigur() {
+  let hoehe = 0;
+  for (const h of hind) if (h.typ !== 'zacke' && ueber(sp.x + 0.08, sp.x + 0.92, h.x, h.x + h.breite) && sp.y >= h.hoehe - 0.1) hoehe = Math.max(hoehe, h.hoehe);
+  return hoehe;
+}
+function zeichnen() {
+  const jetzt = performance.now() / 1000;
+  ctx.save();
+  if (wackeln > 0 && !wenigBewegung) ctx.translate((Math.random() - 0.5) * E * wackeln * 0.6, (Math.random() - 0.5) * E * wackeln * 0.6);
+  // Himmel, Sonne, Berge – beim Level-Wechsel weich von der alten zur neuen Welt
+  if (uebergang > 0 && alteWelt) { hintergrund(alteWelt, 1); hintergrund(welt, 1 - uebergang); }
+  else hintergrund(welt, 1);
+  // Sterne funkeln
+  ctx.fillStyle = '#ffffff';
+  for (const s of sterne) {
+    const x = ((s.x * W * 2 - weltX * E * 0.03) % (W * 2) + W * 2) % (W * 2);
+    if (x < W) { ctx.globalAlpha = 0.45 + 0.4 * Math.sin(jetzt * 2.2 + s.x * 40); ctx.fillRect(x, s.y * BODEN * 0.7, s.r, s.r); }
+  }
+  ctx.globalAlpha = 1;
+  // Geschwindigkeitsstreifen ab hohem Tempo
+  const schnell = zustand === 'spiel' ? Math.min(1, (tempo - 10.5) / 4) : 0;
+  if (schnell > 0) {
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.4;
+    for (const s of streifen) {
+      const lang = E * 2.4 * s.l, x = W + lang - (((weltX * E * 1.7 * s.v) + s.o * W * 1.6) % (W * 1.6 + lang));
+      ctx.globalAlpha = schnell * 0.28 * s.v;
+      ctx.beginPath(); ctx.moveTo(x, s.y * BODEN); ctx.lineTo(x + lang, s.y * BODEN); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // Boden
+  const bodenFarbe = ctx.createLinearGradient(0, BODEN, 0, H);
+  bodenFarbe.addColorStop(0, '#071020'); bodenFarbe.addColorStop(1, '#02050a');
+  ctx.fillStyle = bodenFarbe; ctx.fillRect(-20, BODEN, W + 40, H - BODEN + 20);
   const skin = aktuellerSkin();
+  const fx = sp.x * E + E / 2, fy = BODEN - sp.y * E - E / 2, fs = E * 0.94;
+  // Spiegelung von Hindernissen und Figur im glänzenden Boden
+  ctx.save();
+  ctx.beginPath(); ctx.rect(-20, BODEN, W + 40, H - BODEN + 20); ctx.clip();
+  ctx.translate(0, BODEN * 2); ctx.scale(1, -1);
+  ctx.globalAlpha = 0.17;
+  hindernisseZeichnen(true);
+  if (zustand !== 'tot') figur(ctx, skin, fx, fy, fs, sp.winkel, sp.quetsch || 0);
+  ctx.restore();
+  const ausblenden = ctx.createLinearGradient(0, BODEN, 0, BODEN + E * 2.2);
+  ausblenden.addColorStop(0, 'rgba(7,16,32,0)'); ausblenden.addColorStop(1, 'rgba(6,14,28,1)');
+  ctx.fillStyle = ausblenden; ctx.fillRect(-20, BODEN, W + 40, E * 2.2 + 1);
+  // Neon-Gitter
+  ctx.strokeStyle = welt.haupt; ctx.globalAlpha = 0.26; ctx.lineWidth = 1;
+  const abstand = E * 1.4, versatz = (weltX * E) % abstand;
+  for (let x = -versatz; x < W + abstand; x += abstand) { ctx.beginPath(); ctx.moveTo(x, BODEN); ctx.lineTo(x - (W / 2 - x) * 0.4, H); ctx.stroke(); }
+  for (let k = 1; k < 9; k++) { const y = BODEN + k * k * (H - BODEN) / 64; ctx.globalAlpha = 0.3 - k * 0.025; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  ctx.globalAlpha = 1;
+  ctx.save(); ctx.shadowColor = welt.haupt; ctx.shadowBlur = 14; ctx.strokeStyle = welt.haupt; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0, BODEN); ctx.lineTo(W, BODEN); ctx.stroke(); ctx.restore();
+  // Hindernisse
+  hindernisseZeichnen(false);
+  // Schatten, Leuchtspur und Figur
   if (zustand !== 'tot') {
+    const st = stuetzeUnterFigur(), abstandOben = Math.max(0, sp.y - st);
+    const sb = E * 0.42 * (1 - Math.min(0.6, abstandOben / 5));
+    ctx.globalAlpha = 0.45 * (1 - Math.min(0.75, abstandOben / 4));
+    ctx.fillStyle = '#000000';
+    ctx.beginPath(); ctx.ellipse(fx, BODEN - st * E + 1, sb, sb * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'lighter';
     spur.forEach((p, i) => {
-      ctx.globalAlpha = (i + 1) / spur.length * 0.25;
+      ctx.globalAlpha = (i + 1) / spur.length * 0.22;
       ctx.fillStyle = skin.farbe;
       const s = E * (0.3 + i * 0.06);
-      ctx.fillRect(sp.x * E + E / 2 - (spur.length - i) * E * 0.22 - s / 2, BODEN - p.y * E - E / 2 - s / 2, s, s);
+      ctx.fillRect(fx - (spur.length - i) * E * 0.22 - s / 2, BODEN - p.y * E - E / 2 - s / 2, s, s);
     });
+    ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
-    figur(ctx, skin, sp.x * E + E / 2, BODEN - sp.y * E - E / 2, E * 0.94, sp.winkel);
+    figur(ctx, skin, fx, fy, fs, sp.winkel, sp.quetsch || 0);
   }
-  // Partikel
+  // Partikel: leuchten (additiv), Konfetti normal
   for (const t of teile) {
     ctx.globalAlpha = Math.max(0, Math.min(1, t.leben));
+    ctx.globalCompositeOperation = t.form === 'konfetti' ? 'source-over' : 'lighter';
     ctx.fillStyle = t.farbe; ctx.strokeStyle = t.farbe;
     if (t.form === 'kreis') { ctx.beginPath(); ctx.arc(t.x, t.y, t.groesse, 0, Math.PI * 2); ctx.fill(); }
     else if (t.form === 'ring') { ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(t.x, t.y, t.groesse * (1.6 - t.leben), 0, Math.PI * 2); ctx.stroke(); }
     else if (t.form === 'konfetti') { ctx.save(); ctx.translate(t.x, t.y); ctx.rotate(t.y * 0.05); ctx.fillRect(-t.groesse / 2, -t.groesse / 4, t.groesse, t.groesse / 2); ctx.restore(); }
     else ctx.fillRect(t.x - t.groesse / 2, t.y - t.groesse / 2, t.groesse, t.groesse);
   }
+  ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
   ctx.restore();
-  // Blitz
+  // Blitz und dunklerer Rand
   if (blitz > 0) { ctx.fillStyle = `rgba(255,255,255,${blitz * 0.5})`; ctx.fillRect(0, 0, W, H); }
+  ctx.drawImage(vignetteBild(), 0, 0, W, H);
   // Anzeige oben
   if (zustand !== 'menue') hud();
 }
@@ -809,10 +943,16 @@ function hud() {
   ctx.fillText(endlos ? '♾️ ENDLOS' : `🧱 ${Math.min(punkte, ZIEL)} / ${ZIEL}`, W / 2, by + 24);
   ctx.globalAlpha = 1;
   if (!endlos) {
-    ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(W / 2 - bw / 2, by, bw, 7);
-    ctx.fillStyle = welt.haupt; ctx.shadowColor = welt.haupt; ctx.shadowBlur = 10;
-    ctx.fillRect(W / 2 - bw / 2, by, bw * Math.min(1, punkte / ZIEL), 7);
-    ctx.shadowBlur = 0;
+    rundRechteck(ctx, W / 2 - bw / 2, by, bw, 8, 4);
+    ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fill();
+    const anteil = Math.min(1, punkte / ZIEL);
+    if (anteil > 0) {
+      const bg = ctx.createLinearGradient(W / 2 - bw / 2, 0, W / 2 + bw / 2, 0);
+      bg.addColorStop(0, hexA(welt.haupt, 0.7)); bg.addColorStop(1, welt.haupt);
+      rundRechteck(ctx, W / 2 - bw / 2, by, Math.max(8, bw * anteil), 8, 4);
+      ctx.fillStyle = bg; ctx.shadowColor = welt.haupt; ctx.shadowBlur = 12; ctx.fill();
+      ctx.shadowBlur = 0;
+    }
   }
   ctx.textAlign = 'left'; ctx.font = `700 13px Orbitron, sans-serif`; ctx.globalAlpha = 0.7;
   ctx.fillText(`BEST ${Math.max(daten.best, punkte)}`, 14, oben + 18);
@@ -826,7 +966,7 @@ function hud() {
   if (hinweis) {
     ctx.textAlign = 'center'; ctx.globalAlpha = Math.min(1, hinweis.zeit / 0.4); ctx.shadowBlur = 0;
     ctx.font = `700 ${Math.round(Math.min(20, E * 0.32))}px Rajdhani, sans-serif`;
-    const tw = ctx.measureText(hinweis.text).width + 28, ty = by + 40;
+    const tw = ctx.measureText(hinweis.text).width + 28, ty = levelText ? H * 0.36 + E * 0.3 : by + 40;   // nicht über der großen Level-Schrift
     ctx.fillStyle = 'rgba(7,81,138,.9)'; ctx.fillRect(W / 2 - tw / 2, ty, tw, 30);
     ctx.fillStyle = '#fff'; ctx.fillText(hinweis.text, W / 2, ty + 21);
   }
@@ -920,22 +1060,24 @@ const KONTO = {
   url: 'https://ygdgqpedwdpbxlicviks.supabase.co',
   schluessel: 'sb_publishable_QtZnXFRDB8ypHHmOuY-qLg_MI-52tM5',   // öffentlicher Schlüssel, darf im Code stehen
   bibliothek: 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2',
+  pruefsumme: 'sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF',   // Fingerabdruck: der Browser laedt die Datei nur, wenn sie genau diese ist (neue Version = neuer Fingerabdruck)
   speicherName: 'vorixJumpKonto',
   domain: '@spieler.kronix-timer.app',
   timerAdresse: 'https://ibralox37.github.io/Timer-/',
 };
 let sb = null;   // Verbindung zum Vorix-Server. Wird erst geladen, wenn jemand das Konto benutzt.
-function skriptLaden(src) {
+function skriptLaden(src, pruefsumme) {
   return new Promise((ok, fehler) => {
     const s = document.createElement('script');
     s.src = src; s.async = true; s.crossOrigin = 'anonymous';
+    if (pruefsumme) s.integrity = pruefsumme;
     s.onload = ok; s.onerror = () => fehler(new Error('Konnte nicht laden: ' + src));
     document.head.appendChild(s);
   });
 }
 async function kontoClient() {
   if (sb) return sb;
-  if (!window.supabase) await skriptLaden(KONTO.bibliothek);
+  if (!window.supabase) await skriptLaden(KONTO.bibliothek, KONTO.pruefsumme);
   sb = window.supabase.createClient(KONTO.url, KONTO.schluessel, {
     auth: { storageKey: KONTO.speicherName, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
   });
