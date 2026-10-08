@@ -8,7 +8,7 @@
    Speicher (Name beginnt mit "vorix-jump-"). Fremde Speicher nie anfassen!
    ===================================================================== */
 
-const SPIEL = 'vorix-jump-spiel-2';      // bei jeder neuen Version die Zahl erhöhen (2 = Vorix-Konto, 07.10.2026)
+const SPIEL = 'vorix-jump-spiel-3';      // bei jeder neuen Version die Zahl erhöhen (3 = Start-Fenster Konto/Gast, 08.10.2026)
 const SCHRIFT = 'vorix-jump-schrift-1';  // Schriftarten
 const DATEIEN = ['./', './index.html', './manifest.json', './vorix-logo-hell.png',
   './favicon.png', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
